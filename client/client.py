@@ -53,17 +53,22 @@ class Ftpclient(object):
                 self.command_list()
 
     def put(self,*args):
-
-        user_dict = {
-
-        }
         cmd_split = args[0].split()
         if len(cmd_split) > 1:
             filename = cmd_split[1]
             if os.path.isfile(filename):
                 file_size = os.stat(filename).st_size
-                self.client.send(str(file_size).encode('utf-8'))
 
+                file_dict = json.dumps({'action': 'put', 'filename': filename, 'file_size': file_size})
+                self.client.send(file_dict.encode('utf-8'))
+                if self.client.recv(1024).decode() == '0':
+                    f = open(filename,'rb')
+                    for line in f:
+                        self.client.send(line) #按行发送文件内容
+                    f.close()
+                    print(self.client.recv(1024).decode()) #接受完成信号
+                elif self.client.recv(1024).decode() == '1':
+                    print('超出文件大小')
             else:
                 print('文件不存在，请重新输入！')
 
@@ -71,8 +76,38 @@ class Ftpclient(object):
             print('语法错误！')
             time.sleep(3)
             self.command_list()
-    def get(self):
-        print('get haha')
+
+    def get(self,*args):
+        cmd_split = args[0].split()
+        if len(cmd_split) > 1:
+            filename = cmd_split[1]
+            file_dict = json.dumps({'action':'get','filename':filename})
+            self.client.send(file_dict.encode('utf-8'))
+            file_size = self.client.recv(1024).decode()
+            if file_size == '1':
+                print('文件不存在！')
+            else:
+                totel_file_size = int(file_size)
+                size = 0
+                self.client.send(b'1234')
+
+                f = open(filename,'wb')
+                while size < totel_file_size:
+                    if totel_file_size - size > 1024:
+                        data_size = 1024
+                    else:
+                        data_size = (totel_file_size - size)
+                    data = self.client.recv(data_size)
+                    f.write(data)
+                    size += len(data)
+                else:
+                    print('file getting done')
+                    f.close()
+
+        else:
+            print('语法错误！')
+            time.sleep(3)
+            self.command_list()
     def cd(self):
         pass
     def dir(self,*args):
