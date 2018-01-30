@@ -43,6 +43,7 @@ class Ftpclient(object):
 
     def interactive(self, *args):
         print('********WELCOME********')
+
         while True:
             current_directory = self.client.recv(1024).decode().strip()
             self.client.send(b'asdf') #防止粘包
@@ -152,9 +153,11 @@ class Ftpclient(object):
     def dir(self,*args):
         cmd_split = args[0].split()
         if len(cmd_split) == 1:
-            file_dict = json.dumps({'action': 'cd'})
+            self.client.send('0'.encode('utf-8'))
+            file_dict = json.dumps({'action': 'dir'})
             self.client.send(file_dict.encode('utf-8'))
-
+            dir_list = self.client.recv(1024).decode()
+            print(json.loads(dir_list))
         else:
             print('语法错误')
             time.sleep(0.5)
@@ -176,9 +179,14 @@ class Ftpclient(object):
             self.client.send('1'.encode('utf-8'))
 
     def exit(self,*args):
-        # if len(args) == 1:
-        #     return 1
-        pass
+        cmd_split = args[0].split()
+        if len(cmd_split) == 1:
+            self.client.send('0'.encode('utf-8'))
+            file_dict = json.dumps({'action': 'exit'})
+            self.client.send(file_dict.encode('utf-8'))
+            exit(0)
+
+
     def help(self,*args):
         # if len(args) == 1:
         self.command_list()
@@ -187,5 +195,5 @@ class Ftpclient(object):
 
 
 client = Ftpclient()
-client.connect('localhost',9905)
+client.connect('localhost',9904)
 client.main_menu()
