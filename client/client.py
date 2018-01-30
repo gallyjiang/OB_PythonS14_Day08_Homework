@@ -69,11 +69,15 @@ class Ftpclient(object):
                 file_dict = json.dumps({'action': 'put', 'filename': filename, 'file_size': file_size})
                 self.client.send(file_dict.encode('utf-8'))
                 return_code = self.client.recv(1024).decode()
+
                 if return_code == '0':
+                    m = hashlib.md5()
                     f = open(filename,'rb')
                     i = 0
                     for line in f:
+                        m.update(line) #md5加密
                         self.client.send(line) #按行发送文件内容
+                    self.client.send(m.hexdigest().encode('utf-8'))
                         # a = len(line)/file_size
                         # i += a
                         # rate = int(i*100)
@@ -111,7 +115,7 @@ class Ftpclient(object):
                 totel_file_size = int(file_size)
                 size = 0
                 self.client.send(b'1234')
-
+                m = hashlib.md5()
                 f = open(filename,'wb')
                 while size < totel_file_size:
                     if totel_file_size - size > 1024:
@@ -119,10 +123,16 @@ class Ftpclient(object):
                     else:
                         data_size = (totel_file_size - size)
                     data = self.client.recv(data_size)
+                    m.update(data)
                     f.write(data)
                     size += len(data)
                 else:
-                    print('file getting done')
+                    md5_recv = self.client.recv(1024).decode()
+                    if md5_recv == m.hexdigest():
+                        print('file getting done')
+                    else:
+                        os.remove(filename)
+                        print('file has changed and deleted')
                     f.close()
 
         else:
@@ -195,5 +205,5 @@ class Ftpclient(object):
 
 
 client = Ftpclient()
-client.connect('localhost',9904)
+client.connect('localhost',9903)
 client.main_menu()
