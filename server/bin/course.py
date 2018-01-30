@@ -65,19 +65,26 @@ class Mytcpserver(socketserver.BaseRequestHandler):
                                 if int_file_size - int_quota <= 0:  # 文件大小小于磁盘配置
                                     int_quota -= int_file_size
                                     self.request.send('0'.encode('utf-8'))
+                                    m1 = hashlib.md5()
                                     while size < int_file_size:
                                         if int_file_size - size > 1024:
                                             data_size = 1024
                                         else:
                                             data_size = (int_file_size - size)
                                         data = self.request.recv(data_size)
+                                        m1.update(data) #md5加密
                                         f.write(data)
                                         size += len(data)
                                         # i = int((size / int_file_size)*100)
                                         # self.request.send(str(i).encode('utf-8'))
 
                                     else:
-                                        self.request.send('file putting has done'.encode('utf-8'))
+                                        md5_recv = self.request.recv(1024).decode()
+                                        if md5_recv == m1.hexdigest(): #判断是否被修改
+                                            self.request.send('file putting has done'.encode('utf-8'))
+                                        else:
+                                            os.remove(self.put_filename)
+                                            self.request.send('file has changed and deleted'.encode('utf-8'))
                                         f.close()
                                 else:
                                     self.request.send('1'.encode('utf-8'))
@@ -89,9 +96,12 @@ class Mytcpserver(socketserver.BaseRequestHandler):
                                     file_size = os.stat(self.get_filename).st_size
                                     self.request.send(str(file_size).encode('utf-8'))  # 发送文件大小
                                     self.request.recv(1024)  # 接受应答,防止粘包
+                                    m2 = hashlib.md5()
                                     f = open(self.get_filename, 'rb')
                                     for line in f:
+                                        m2.update(line)
                                         self.request.send(line)
+                                    self.request.send(m2.hexdigest().encode())
                                     f.close()
                                 else:
                                     self.request.send('1'.encode('utf-8'))
@@ -112,20 +122,16 @@ class Mytcpserver(socketserver.BaseRequestHandler):
                                 else:
                                     self.request.send('拒绝访问'.encode('utf-8'))
                             elif self.action == 'dir':
-                                pass
+                                dir_list = os.listdir(full_dir[-1])
+                                self.request.send(json.dumps(dir_list).encode('utf-8'))
                             elif self.action == 'pwd':
                                 self.request.send(relative_dir[-1].encode('utf-8'))
-
+                            elif self.action == 'exit':
+                                exit(0)
 
                 else:
                     self.request.send('0'.encode('utf-8'))
                     continue
-
-
-
-
-
-
 
         except ConnectionResetError as e:
             print('error:',e)
@@ -134,10 +140,9 @@ class Mytcpserver(socketserver.BaseRequestHandler):
 
 
 
-    def pwd(self):
-        pass
+
 if __name__ == '__main__':
-    HOST,PORT = 'localhost',9905
+    HOST,PORT = 'localhost',9903
     server = socketserver.ThreadingTCPServer((HOST,PORT),Mytcpserver)
     server.serve_forever()
 
